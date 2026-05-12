@@ -3,3 +3,4 @@ moviepy
 openai-whisper
 Pillow
 numpy
+ffmpeg-python
