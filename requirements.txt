@@ -4,3 +4,4 @@ openai-whisper
 Pillow>=10.0.0
 numpy
 ffmpeg-python
+scipy
