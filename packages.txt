@@ -1,2 +1,2 @@
 ffmpeg
-imagemagick
+fonts-dejavu-core
