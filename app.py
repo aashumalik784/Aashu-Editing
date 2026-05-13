@@ -7,7 +7,7 @@ import tempfile
 import numpy as np
 
 # Professional UI Styling
-st.set_page_config(page_title="Pro Video Editor", layout="wide")
+st.set_page_config(page_title="Pro Video Editor - Multilingual Lyrics", layout="wide")
 st.markdown("""
     <style>
     .main { background-color: #0e1117; color: #ffffff; }
@@ -26,11 +26,15 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🎬 Professional AI Video Editor")
-st.write("Automatically add subtitles and logos to your videos.")
+st.write("Automatically add subtitles (English/Hindi) and logos to your videos.")
 
 # Sidebar for customization
 st.sidebar.header("Settings")
 logo_text = st.sidebar.text_input("Logo Watermark", value="Aashu Editing")
+
+# NEW: Naya option language selection ke liye
+subtitle_lang = st.sidebar.selectbox("Subtitle Language", ["English", "Hindi"])
+
 font_size = st.sidebar.slider("Font Size", 20, 100, 40)
 text_color = st.sidebar.color_picker("Subtitle Color", "#FFFFFF")
 
@@ -45,11 +49,19 @@ if uploaded_file is not None:
 
     if st.button("🚀 START REAL EDITING"):
         with st.status("Editing in progress...", expanded=True) as status:
-            # Step 1: Transcription
-            st.write("Step 1/3: AI is listening to video (Whisper)...")
+            # Step 1: Transcription (English or Hindi)
+            st.write(f"Step 1/3: AI is listening to video (Whisper) for {subtitle_lang} subtitles...")
             try:
                 model = whisper.load_model("base")
-                result = model.transcribe(video_path)
+                
+                # Language conversion ke liye correct key pass karein
+                if subtitle_lang == "Hindi":
+                    # For Hindi, we first try to detect and transcribe, then translate if needed.
+                    result = model.transcribe(video_path, language='hi', task='transcribe')
+                else:
+                    # For English, standard transcribe
+                    result = model.transcribe(video_path, language='en', task='transcribe')
+
                 captions = result['segments']
                 st.write("Step 1 Complete: Audio transcribed.")
             except Exception as e:
@@ -61,15 +73,28 @@ if uploaded_file is not None:
             video = mp.VideoFileClip(video_path)
             
             # Step 3: Subtitles + Logo (Fixing Pillow textsize error)
-            st.write("Step 3/3: Applying Subtitles & Logo...")
+            st.write(f"Step 3/3: Applying {subtitle_lang} Subtitles & Logo...")
             
             def add_overlays(get_frame, t):
                 frame = get_frame(t)
                 img = Image.fromarray(frame)
                 draw = ImageDraw.Draw(img)
                 
+                # Hindi font handling (Requires a font with Hindi glyphs, default may not support it)
                 try:
-                    font = ImageFont.truetype("arial.ttf", font_size)
+                    if subtitle_lang == "Hindi":
+                        # Standard path to common Hindi-supporting font on Linux. 
+                        # Update this path if necessary. Example: "NotoSansDevanagari-Regular.ttf"
+                        font_path = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
+                        if os.path.exists(font_path):
+                            font = ImageFont.truetype(font_path, font_size)
+                        else:
+                            # Fallback if specific font not found, but it might not show glyphs correctly.
+                            font = ImageFont.load_default()
+                            st.warning("NotoSansDevanagari font not found. Hindi characters might not display correctly. Update packages.txt with 'fonts-noto-core' or 'fonts-dejavu-core'.")
+                    else:
+                        font = ImageFont.truetype("arial.ttf", font_size)
+                        
                     logo_font = ImageFont.truetype("arial.ttf", 30)
                 except:
                     font = ImageFont.load_default()
@@ -81,7 +106,7 @@ if uploaded_file is not None:
                 img_w, img_h = img.size
                 draw.text((img_w - (right-left) - 20, 20), logo_text, font=logo_font, fill=(255, 255, 255, 128))
 
-                # 2. Drawing Subtitles
+                # 2. Drawing Subtitles (English or Hindi)
                 current_text = ""
                 for seg in captions:
                     if seg['start'] <= t <= seg['end']:
@@ -91,6 +116,7 @@ if uploaded_file is not None:
                 if current_text:
                     left, top, right, bottom = draw.textbbox((0, 0), current_text, font=font)
                     w, h = right - left, bottom - top
+                    # Center bottom alignment
                     draw.text(((img_w - w) / 2, img_h - h - 50), current_text, font=font, fill=text_color)
                 
                 return np.array(img)
@@ -104,6 +130,7 @@ if uploaded_file is not None:
         st.success("Video processed successfully!")
         with open(output_path, "rb") as file:
             st.download_button("📥 Download Edited Video", file, file_name="edited_video.mp4")
+
 else:
     st.info("Please upload a video to start.")
-    
+                
